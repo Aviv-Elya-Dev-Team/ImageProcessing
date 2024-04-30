@@ -1,7 +1,13 @@
 import cv2
 import numpy as np, numpy
-from coins_summation import show_image_plt
-from coins_summation import base_images
+
+
+base_images = {
+    2: cv2.imread("imgs/2.jpg")[1800:3400, 900:2500],
+    5: cv2.imread("imgs/5.jpg")[2025:2925, 1175:2075],
+    10: cv2.imread("imgs/10.jpg")[2160:3060, 1310:2210],
+    50: cv2.imread("imgs/50.jpg")[2235:3320, 865:2000],
+}
 
 def mask_coin(image):
     height, width, _ = image.shape
@@ -63,11 +69,46 @@ def distance(point1, point2):
 
     return distance  
 
-def main():
-    show_image_plt(mask_coin(base_images[2]))
-    show_image_plt(mask_coin(base_images[5]))
-    show_image_plt(mask_coin(base_images[10]))
-    show_image_plt(mask_coin(base_images[50]))
 
-if __name__ == "__main__":
-    main()
+def mask_circular_objects(image):
+    # Convert the image to grayscale
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+    # Apply Gaussian blur to reduce noise
+    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+
+    # Detect circles using Hough Circle Transform
+    circles = cv2.HoughCircles(
+        blurred,
+        cv2.HOUGH_GRADIENT,
+        dp=1,
+        minDist=50,
+        param1=50,
+        param2=30,
+        minRadius=200,
+        maxRadius=400
+    )
+
+    # Initialize a mask with zeros
+    mask = np.zeros(gray.shape, dtype=np.uint8)
+
+    if circles is not None:
+        # Convert the circle parameters to integers
+        circles = np.round(circles[0, :]).astype("int")
+
+        # Draw circles on the mask
+        for (x, y, r) in circles:
+            cv2.circle(mask, (x, y), r, (255), -1)
+
+    return mask
+
+
+# Example usage:
+# Load your image
+# image = cv2.imread('your_image.jpg')
+# mask = find_circular_objects(image)
+
+# Optionally, you can display the mask
+# cv2.imshow("Mask", mask)
+# cv2.waitKey(0)
+# cv2.destroyAllWindows()
