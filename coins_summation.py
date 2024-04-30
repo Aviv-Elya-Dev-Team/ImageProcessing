@@ -4,8 +4,12 @@ import os
 from matplotlib import pyplot as plt
 from coin_radius_finder import mask_coin, base_images, mask_circular_objects
 
-# focus the images on the coins so that the SIFT algorithm only finds features inside
-# the coins and not elsewhere in the image
+# typing
+import numpy.typing
+
+# from cv2.typing import Point # TODO: remove if unused
+
+MatLike = numpy.typing.NDArray[numpy.uint8]
 
 
 def show_image_cv(img, title="title"):
@@ -49,7 +53,18 @@ def calculate_masked_images():
     return masked_images
 
 
-def count_coin_appearances(template_image, target_image):
+def count_matches(template_image: MatLike, target_image: MatLike, threshold=0.8):
+    """
+    counts how many good matches are in the target_image from the template_image
+
+    Args:
+        template_image (MatLike): input image to extract matches from and search in target_image
+        target_image (MatLike): image to find matches in
+        threshold (float, optional): filters out matches too close to each other. Defaults to 0.8.
+
+    Returns:
+        int: number of good matches (within the threshold) found
+    """
 
     # Initialize the SIFT detector
     sift = cv2.SIFT_create()
@@ -68,84 +83,58 @@ def count_coin_appearances(template_image, target_image):
 
     good_matches = []
     for m, n in matches:
-        if m.distance < 0.8 * n.distance:
+        if m.distance < threshold * n.distance:
             good_matches.append(m)
 
-    # Extract the location of keypoints in the target image
+    return len(good_matches)
+
+    # get the location of keypoints in the target image
     target_keypoint_locations = [
         keypoints_target[match.trainIdx].pt for match in good_matches
     ]
-
-    # Count the number of unique occurrences
+    # count the number of unique occurrences
     unique_locations = set(target_keypoint_locations)
-    num_occurrences = len(unique_locations)
-
-    # Draw matches
-    result = cv2.drawMatches(
-        template_image,
-        keypoints_template,
-        target_image,
-        keypoints_target,
-        good_matches,
-        None,
-        flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS,
-    )
-    show_image_plt(result)
-    return num_occurrences
+    return len(unique_locations)
 
 
-def sum_coin_values_sift(image_path, threshold=0.75):
-    # read the input image
-    input_image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+def sum_coins(masked_images, target_image):
+    result = 0
 
-    # Initialize sum of coin values
-    total_value = 0
+    # extract just the coins from the target image
+    target_coins_circles = find_coins(target_image)
+    target_coins_images = [
+        extract_coin_from_image(target_image, (coin[0], coin[1]), coin[2])
+        for coin in target_coins_circles
+    ]
 
-    # Create SIFT detector
-    sift = cv2.SIFT_create()
+    # classify each coin from the target image and add to the sum
+    for target_coin_image in target_coins_images:
+        target_coin = classify_from_image(masked_images, target_coin_image)
+        result += target_coin
 
-    # Compute keypoints and descriptors for input image
-    kp_input, des_input = sift.detectAndCompute(input_image, None)
-
-    # Initialize BFMatcher
-    bf = cv2.BFMatcher()
-
-    # Match descriptors of input image with each template
-    for value, template in base_images.items():
-        # Compute keypoints and descriptors for template
-        kp_template, des_template = sift.detectAndCompute(template, None)
-
-        # Match descriptors
-        matches = bf.knnMatch(des_template, des_input, k=2)
-
-        # Apply ratio test
-        good_matches = []
-        for m, n in matches:
-            if m.distance < threshold * n.distance:
-                good_matches.append(m)
-
-        # Add the value of each matched coin to the total
-        total_value += value * len(good_matches)
-
-    return total_value
+    return result
 
 
-def sum_coin_occurrences(masked_images, target_image):
-    base_coins_values = [2, 5, 10, 50]
-    base_images_num_matches = {
-        2: count_coin_appearances(masked_images[2], masked_images[2]),
-        5: count_coin_appearances(masked_images[5], masked_images[5]),
-        10: count_coin_appearances(masked_images[10], masked_images[10]),
-        50: count_coin_appearances(masked_images[50], masked_images[50]),
-    }
-    result = {2: 0, 5: 0, 10: 0, 50: 0}
-    print(base_images_num_matches)
-    for base_coin in base_coins_values:
-        result[base_coin] = count_coin_appearances(
-            masked_images[base_coin], target_image
-        )
+def classify_from_image(masked_images: dict, coin_image: MatLike) -> int:
+    """
+    checks which coin the given coin image most closely resembles
+    from the base and masked coin images (2, 5, 10, 50)
 
-    print(result)
+    Args:
+        coin_image (MatLike): the input coin image
+
+    Returns:
+        int: the coin that the given image represents the most
+    """
+    result = -1
+    max_matches = 0
+    for base_coin in masked_images.keys():
+        num_matches = count_matches(masked_images[base_coin], coin_image)
+        if num_matches > max_matches:
+            result = base_coin
+            max_matches = num_matches
+
+    return result
 
 
 def circle_edges(image):
@@ -161,12 +150,26 @@ def circle_edges(image):
     return edges
 
 
-def find_and_draw_circles(image, threshold=200):
+def find_coins(image, threshold=200, draw_circles_on_image=False):
+    """
+    uses hough transform with circles to detect coins inside the image.
+    then, it extracts their center and radius and returns a list of all of em
+    (not perfect but it works pretty good)
+
+    Args:
+        image: _description_
+        threshold (int, optional): _description_. Defaults to 200.
+
+    Returns:
+        list: a list that contains the coordiantes of the center of the coin and its radius
+    """
+
+    # make the image gray if its not already
     gray = image
     if len(image.shape) != 2:
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-    edges = circle_edges(image)
+    edges = circle_edges(gray)
     circles = circles = cv2.HoughCircles(
         edges, cv2.HOUGH_GRADIENT, 1, 20, param1=50, param2=30, minRadius=0, maxRadius=0
     )
@@ -187,7 +190,8 @@ def find_and_draw_circles(image, threshold=200):
             if not added_to_group:
                 grouped_circles[(x, y)] = [(x, y, r)]
 
-        # Calculate the average center point and radius for each group
+        # calculate the average center point and radius for each group
+        # and append to circle list
         for center_point, circle_group in grouped_circles.items():
             group_x, group_y, group_r = zip(*circle_group)
             avg_x = int(np.mean(group_x))
@@ -195,23 +199,48 @@ def find_and_draw_circles(image, threshold=200):
             avg_r = int(np.mean(group_r))
             circle_list.append([avg_x, avg_y, avg_r])
 
-        # Draw the average circles on the original image
-        for avg_x, avg_y, avg_r in circle_list:
-            cv2.circle(image, (avg_x, avg_y), avg_r, (0, 0, 255), 4)
+        # draw the average circles on the original image if the user wants
+        if draw_circles_on_image:
+            for avg_x, avg_y, avg_r in circle_list:
+                cv2.circle(image, (avg_x, avg_y), avg_r, (0, 0, 255), 4)
 
-    return circle_list, image
+    return circle_list
+
+
+def extract_coin_from_image(image, coin_center, coin_radius):
+    center_x, center_y = coin_center
+
+    # calculate box boundaries
+    top_left_x = int(center_x - coin_radius)
+    top_left_y = int(center_y - coin_radius)
+    bottom_right_x = int(center_x + coin_radius)
+    bottom_right_y = int(center_y + coin_radius)
+
+    # take care of edges of the image
+    top_left_x = max(0, top_left_x)
+    top_left_y = max(0, top_left_y)
+    bottom_right_x = min(image.shape[1], bottom_right_x)
+    bottom_right_y = min(image.shape[0], bottom_right_y)
+
+    # extract the circle from the image and
+    # create a new image with just the coin
+    circle_region = image[top_left_y:bottom_right_y, top_left_x:bottom_right_x]
+    mask = np.zeros_like(circle_region)
+    cv2.circle(mask, (coin_radius, coin_radius), coin_radius, (255, 255, 255), -1, 8, 0)
+
+    masked_circle = cv2.bitwise_and(circle_region, mask)
+    result = np.zeros_like(masked_circle)
+    result[mask == 255] = masked_circle[mask == 255]
+
+    return result
 
 
 def main():
     masked_images = calculate_masked_images()
 
-    template_image = masked_images[2]  # Provide the path to your input image here
-    target_image = cv2.imread("imgs/62.jpg")
+    target_image = cv2.imread("imgs/144_2.jpg")
 
-    # sum_coin_occurrences(masked_images, target_image)
-
-    show_image_plt(find_and_draw_circles(target_image)[1])
-
+    print(sum_coins(masked_images, target_image))
     # print(count_object_appearances(template_image, target_image))
 
 
