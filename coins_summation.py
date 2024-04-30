@@ -155,32 +155,26 @@ def circle_edges(image):
     edges = dilated-blurred
     _, edges = cv2.threshold(edges, 3, 255, cv2.THRESH_BINARY)
     edges = cv2.erode(edges, kernel, iterations=3)
-    
     return edges
 
-def find_and_draw_circles(image):
-    # Convert image to grayscale
+def find_and_draw_circles(image, threshold=200):
     gray = image
     if len(image.shape) != 2:
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-    # Apply Hough Circle Transform to detect circles
     edges = circle_edges(image)
     circles = circles = cv2.HoughCircles(edges,cv2.HOUGH_GRADIENT,1,20,param1=50,param2=30,minRadius=0,maxRadius=0)
     circle_list = []
-    # If circles are found, group them based on their center points
     if circles is not None:
         circles = np.round(circles[0, :]).astype("int")
-        grouped_circles = {}  # Dictionary to store circles grouped by center points
+        grouped_circles = {} 
         for (x, y, r) in circles:
-            # Check if the circle can be added to an existing group
             added_to_group = False
             for center_point, circle_group in grouped_circles.items():
-                if np.linalg.norm(np.array([x, y]) - np.array(center_point)) < 150:  # Adjust this threshold as needed
+                if np.linalg.norm(np.array([x, y]) - np.array(center_point)) < threshold:
                     circle_group.append((x, y, r))
                     added_to_group = True
                     break
-            # If the circle does not belong to any existing group, create a new group
             if not added_to_group:
                 grouped_circles[(x, y)] = [(x, y, r)]
 
