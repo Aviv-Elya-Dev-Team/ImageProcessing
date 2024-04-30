@@ -1,4 +1,5 @@
 import cv2
+import numpy as np
 import os
 from matplotlib import pyplot as plt
 from coin_radius_finder import mask_coin, base_images, mask_circular_objects
@@ -143,6 +144,59 @@ def sum_coin_occurrences(masked_images, target_image):
         result[base_coin] = count_coin_appearances(masked_images[base_coin], target_image)
 
     print(result)
+
+def circle_edges(image):
+    # Read the image
+    if len(image.shape) != 2:
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    blurred = cv2.GaussianBlur(image, (255, 255), 0)
+    kernel = np.ones((11,11), dtype=np.uint8)
+    dilated = cv2.dilate(blurred, kernel, iterations=1)
+    edges = dilated-blurred
+    _, edges = cv2.threshold(edges, 3, 255, cv2.THRESH_BINARY)
+    edges = cv2.erode(edges, kernel, iterations=3)
+    
+    return edges
+
+def find_and_draw_circles(image):
+    # Convert image to grayscale
+    gray = image
+    if len(image.shape) != 2:
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+    # Apply Hough Circle Transform to detect circles
+    edges = circle_edges(image)
+    circles = circles = cv2.HoughCircles(edges,cv2.HOUGH_GRADIENT,1,20,param1=50,param2=30,minRadius=0,maxRadius=0)
+    circle_list = []
+    # If circles are found, group them based on their center points
+    if circles is not None:
+        circles = np.round(circles[0, :]).astype("int")
+        grouped_circles = {}  # Dictionary to store circles grouped by center points
+        for (x, y, r) in circles:
+            # Check if the circle can be added to an existing group
+            added_to_group = False
+            for center_point, circle_group in grouped_circles.items():
+                if np.linalg.norm(np.array([x, y]) - np.array(center_point)) < 150:  # Adjust this threshold as needed
+                    circle_group.append((x, y, r))
+                    added_to_group = True
+                    break
+            # If the circle does not belong to any existing group, create a new group
+            if not added_to_group:
+                grouped_circles[(x, y)] = [(x, y, r)]
+
+        # Calculate the average center point and radius for each group
+        for center_point, circle_group in grouped_circles.items():
+            group_x, group_y, group_r = zip(*circle_group)
+            avg_x = int(np.mean(group_x))
+            avg_y = int(np.mean(group_y))
+            avg_r = int(np.mean(group_r))
+            circle_list.append([avg_x, avg_y, avg_r])
+
+        # Draw the average circles on the original image
+        for (avg_x, avg_y, avg_r) in circle_list:
+            cv2.circle(image, (avg_x, avg_y), avg_r, (0, 0, 255), 4)
+
+    return circle_list, image
 
 
 def main():
