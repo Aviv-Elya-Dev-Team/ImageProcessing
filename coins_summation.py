@@ -25,7 +25,6 @@ def clean_image(image, size=(11, 11), sigmaX=5):
 
 def calculate_masked_images():
     masked_images = {}
-    print("calculating base images mask, please wait...")
     load = False
     for key in [2, 5, 10, 50]:
         if os.path.exists(f"templates/{str(key)}.png"):
@@ -34,6 +33,8 @@ def calculate_masked_images():
 
     if load:
         return masked_images
+    else:
+        print("calculating base images masks, please wait...")
 
     masked_images = {
         2: mask_coin(base_images[2]),
@@ -69,28 +70,26 @@ def count_coin_appearances(template_image, target_image):
         if m.distance < 0.8 * n.distance:
             good_matches.append(m)
 
-    return len(good_matches)
+    # Extract the location of keypoints in the target image
+    target_keypoint_locations = [
+        keypoints_target[match.trainIdx].pt for match in good_matches
+    ]
 
-    # # Extract the location of keypoints in the target image
-    # target_keypoint_locations = [
-    #     keypoints_target[match.trainIdx].pt for match in good_matches
-    # ]
-
-    # # Count the number of unique occurrences
-    # unique_locations = set(target_keypoint_locations)
-    # num_occurrences = len(unique_locations)
+    # Count the number of unique occurrences
+    unique_locations = set(target_keypoint_locations)
+    num_occurrences = len(unique_locations)
 
     # Draw matches
-    # result = cv2.drawMatches(
-    #     template_image,
-    #     keypoints_template,
-    #     target_image,
-    #     keypoints_target,
-    #     good_matches,
-    #     None,
-    #     flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS,
-    # )
-    # show_image_plt(result)
+    result = cv2.drawMatches(
+        template_image,
+        keypoints_template,
+        target_image,
+        keypoints_target,
+        good_matches,
+        None,
+        flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS,
+    )
+    show_image_plt(result)
     return num_occurrences
 
 
@@ -139,8 +138,9 @@ def sum_coin_occurrences(masked_images, target_image):
         50: count_coin_appearances(masked_images[50], masked_images[50]),
     }
     result = {2: 0, 5: 0, 10: 0, 50: 0}
+    print(base_images_num_matches)
     for base_coin in base_coins_values:
-        result[base_coin] = base_images_num_matches / count_coin_appearances(masked_images[base_coin], target_image)
+        result[base_coin] = count_coin_appearances(masked_images[base_coin], target_image)
 
     print(result)
 
@@ -150,7 +150,6 @@ def main():
 
     template_image = masked_images[2]  # Provide the path to your input image here
     target_image = cv2.imread("imgs/62.jpg")
-    show_image_plt(mask_circular_objects(target_image))
 
     sum_coin_occurrences(masked_images, target_image)
 
