@@ -141,21 +141,25 @@ def sum_coin_occurrences(masked_images, target_image):
     result = {2: 0, 5: 0, 10: 0, 50: 0}
     print(base_images_num_matches)
     for base_coin in base_coins_values:
-        result[base_coin] = count_coin_appearances(masked_images[base_coin], target_image)
+        result[base_coin] = count_coin_appearances(
+            masked_images[base_coin], target_image
+        )
 
     print(result)
+
 
 def circle_edges(image):
     # Read the image
     if len(image.shape) != 2:
         image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     blurred = cv2.GaussianBlur(image, (255, 255), 0)
-    kernel = np.ones((11,11), dtype=np.uint8)
+    kernel = np.ones((11, 11), dtype=np.uint8)
     dilated = cv2.dilate(blurred, kernel, iterations=1)
-    edges = dilated-blurred
+    edges = dilated - blurred
     _, edges = cv2.threshold(edges, 3, 255, cv2.THRESH_BINARY)
     edges = cv2.erode(edges, kernel, iterations=3)
     return edges
+
 
 def find_and_draw_circles(image, threshold=200):
     gray = image
@@ -163,15 +167,20 @@ def find_and_draw_circles(image, threshold=200):
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
     edges = circle_edges(image)
-    circles = circles = cv2.HoughCircles(edges,cv2.HOUGH_GRADIENT,1,20,param1=50,param2=30,minRadius=0,maxRadius=0)
+    circles = circles = cv2.HoughCircles(
+        edges, cv2.HOUGH_GRADIENT, 1, 20, param1=50, param2=30, minRadius=0, maxRadius=0
+    )
     circle_list = []
     if circles is not None:
         circles = np.round(circles[0, :]).astype("int")
-        grouped_circles = {} 
-        for (x, y, r) in circles:
+        grouped_circles = {}
+        for x, y, r in circles:
             added_to_group = False
             for center_point, circle_group in grouped_circles.items():
-                if np.linalg.norm(np.array([x, y]) - np.array(center_point)) < threshold:
+                if (
+                    np.linalg.norm(np.array([x, y]) - np.array(center_point))
+                    < threshold
+                ):
                     circle_group.append((x, y, r))
                     added_to_group = True
                     break
@@ -187,7 +196,7 @@ def find_and_draw_circles(image, threshold=200):
             circle_list.append([avg_x, avg_y, avg_r])
 
         # Draw the average circles on the original image
-        for (avg_x, avg_y, avg_r) in circle_list:
+        for avg_x, avg_y, avg_r in circle_list:
             cv2.circle(image, (avg_x, avg_y), avg_r, (0, 0, 255), 4)
 
     return circle_list, image
@@ -199,7 +208,9 @@ def main():
     template_image = masked_images[2]  # Provide the path to your input image here
     target_image = cv2.imread("imgs/62.jpg")
 
-    sum_coin_occurrences(masked_images, target_image)
+    # sum_coin_occurrences(masked_images, target_image)
+
+    show_image_plt(find_and_draw_circles(target_image)[1])
 
     # print(count_object_appearances(template_image, target_image))
 

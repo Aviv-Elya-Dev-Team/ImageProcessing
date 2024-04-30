@@ -9,6 +9,7 @@ base_images = {
     50: cv2.imread("imgs/50.jpg")[2235:3320, 865:2000],
 }
 
+
 def mask_coin(image):
     height, width, _ = image.shape
 
@@ -35,7 +36,7 @@ def mask_coin(image):
         for circle in circles[0, :]:
             # choose best circle by its score
             score = circle_score(circle, image_center)
-        
+
             if score > best_score:
                 best_circle = circle
                 best_score = score
@@ -55,11 +56,13 @@ def mask_coin(image):
 
     return result
 
+
 # get score of the circle, we want bigger
 # radius and small distance from the center
 def circle_score(circle, center_img):
     circle_x, circle_y, radius = circle
-    return radius/(50 + distance(center_img, (circle_x, circle_y)))
+    return radius / (50 + distance(center_img, (circle_x, circle_y)))
+
 
 def distance(point1, point2):
     # Euclidean distance
@@ -67,7 +70,7 @@ def distance(point1, point2):
     x2, y2 = point2
     distance = numpy.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
 
-    return distance  
+    return distance
 
 
 def mask_circular_objects(image):
@@ -86,7 +89,7 @@ def mask_circular_objects(image):
         param1=50,
         param2=30,
         minRadius=200,
-        maxRadius=400
+        maxRadius=400,
     )
 
     # Initialize a mask with zeros
@@ -97,18 +100,15 @@ def mask_circular_objects(image):
         circles = np.round(circles[0, :]).astype("int")
 
         # Draw circles on the mask
-        for (x, y, r) in circles:
+        for x, y, r in circles:
             cv2.circle(mask, (x, y), r, (255), -1)
 
     return mask
 
 
-# Example usage:
-# Load your image
-# image = cv2.imread('your_image.jpg')
-# mask = find_circular_objects(image)
+def main():
+    mask_coin(cv2.imread("imgs/62.jpg"))
 
-# Optionally, you can display the mask
-# cv2.imshow("Mask", mask)
-# cv2.waitKey(0)
-# cv2.destroyAllWindows()
+
+if __name__ == "__main__":
+    main()
