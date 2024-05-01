@@ -3,10 +3,10 @@ import numpy as np, numpy
 
 
 base_images = {
-    2: cv2.imread("imgs/2.jpg")[1800:3400, 900:2500],
-    5: cv2.imread("imgs/5.jpg")[2025:2925, 1175:2075],
-    10: cv2.imread("imgs/10.jpg")[2160:3060, 1310:2210],
-    50: cv2.imread("imgs/50.jpg")[2235:3320, 865:2000],
+    2: cv2.imread("imgs/62.jpg")[3517:4100,874:1470],
+    5: cv2.imread("imgs/5.jpg")[2127:2528, 1391:1875],
+    10: cv2.imread("imgs/67.jpg")[1563:2100, 585:922],
+    50: cv2.imread("imgs/50.jpg")[2410:2859, 1032:1853],
 }
 
 
@@ -53,8 +53,7 @@ def mask_coin(image):
 
         # Apply the mask to the original image
         result = cv2.bitwise_and(image, image, mask=mask)
-
-    return result
+        return result
 
 
 # get score of the circle, we want bigger
