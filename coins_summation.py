@@ -133,12 +133,9 @@ def sum_coins(masked_images, target_image):
 
     # classify each coin from the target image and add to the sum
     for target_coin_image in target_coins_images:
-        target_coin = find_best_matching_template(masked_images, target_coin_image)
-        """"
         target_coin = classify_from_image(
             masked_images, base_coin_matches, target_coin_image
         )
-        """
         result += target_coin
         show_image_plt(
             target_coin_image, title=f"Prediction: {target_coin} Sum: {result}"
@@ -288,48 +285,6 @@ def extract_coin_from_image(image, coin_center, coin_radius):
 
     return result
 
-
-def find_best_matching_template(templates: dict, input_image: MatLike):
-    best_match_distance = float('inf')
-    best_match_index = -1
-    
-    # Initialize SIFT detector
-    sift = cv2.SIFT_create()
-    
-    # Detect keypoints and descriptors for input image
-    input_gray = cv2.cvtColor(input_image, cv2.COLOR_BGR2GRAY)
-    kp_input, des_input = sift.detectAndCompute(input_gray, None)
-    
-    # Initialize FLANN matcher
-    flann = cv2.FlannBasedMatcher_create()
-    
-    for key in templates.keys():
-        # Detect keypoints and descriptors for template image
-        template_gray = cv2.cvtColor(templates[key], cv2.COLOR_BGR2GRAY)
-        kp_template, des_template = sift.detectAndCompute(template_gray, None)
-        
-        if des_template is None:
-            continue
-        
-        # Match descriptors between input image and template
-        matches = flann.knnMatch(des_template, des_input, k=2)
-        
-        # Apply ratio test
-        good_matches = []
-        for m, n in matches:
-            if m.distance < 0.7 * n.distance:
-                good_matches.append(m)
-        
-        if len(good_matches) > 0:
-            # Calculate average distance of matched keypoints
-            distance = np.mean([m.distance for m in good_matches])
-            
-            # Update best match if current match distance is lower
-            if distance < best_match_distance:
-                best_match_distance = distance
-                best_match_index = key
-    
-    return best_match_index
 
 
 def main():
