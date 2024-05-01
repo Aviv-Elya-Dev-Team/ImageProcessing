@@ -42,10 +42,10 @@ def calculate_masked_images():
     else:
         print("calculating base images masks, please wait...")
         masked_images = {
-            2: base_images[2],
-            5: base_images[5],
-            10: base_images[10],
-            50: base_images[50]
+            2: cv2.cvtColor(mask_coin(base_images[2]), cv2.COLOR_RGB2GRAY),
+            5: cv2.cvtColor(mask_coin(base_images[5]), cv2.COLOR_RGB2GRAY),
+            10: cv2.cvtColor(mask_coin(base_images[10]), cv2.COLOR_RGB2GRAY),
+            50: cv2.cvtColor(mask_coin(base_images[50]), cv2.COLOR_RGB2GRAY),
         }
         # blur the 50,5 coin because its too high quality and it fucks with
         # finding keypoint descriptors later
@@ -60,7 +60,9 @@ def calculate_masked_images():
     return masked_images
 
 
-def count_matches(template_image: MatLike, target_image: MatLike, threshold=0.8):
+def count_matches(
+    template_image: MatLike, target_image: MatLike, threshold=0.99, draw_matches=False
+):
     """
     counts how many good matches are in the target_image from the template_image
 
@@ -91,19 +93,21 @@ def count_matches(template_image: MatLike, target_image: MatLike, threshold=0.8)
     for m, n in matches:
         if m.distance < threshold * n.distance:
             good_matches.append(m)
-    """
-    matched_img = cv2.drawMatches(
-        template_image,
-        keypoints_template,
-        target_image,
-        keypoints_target,
-        good_matches,
-        None,
-        flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS,
-    )
-    show_image_plt(matched_img)
+
+    if draw_matches:
+
+        matched_img = cv2.drawMatches(
+            template_image,
+            keypoints_template,
+            target_image,
+            keypoints_target,
+            good_matches,
+            None,
+            flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS,
+        )
+        show_image_plt(matched_img)
     return len(good_matches)
-    """
+
     # get the location of keypoints in the target image
     target_keypoint_locations = [
         keypoints_target[match.trainIdx].pt for match in good_matches
@@ -161,15 +165,23 @@ def classify_from_image(
         int: the coin that the given image represents the most
     """
 
-    def ratio(num_matches):
-        return num_matches  # 9 ** (numpy.log10(num_matches))
+    def ratio(base_coin):
+        if base_coin == 50:
+            return 1742 / 3868 +0.15
+        if base_coin == 10:
+            return 894 / 3868 + 0.1
+        if base_coin == 5:
+            return 655 / 3868 + 0.25
+        if base_coin == 2:
+            return 577 / 3868 + 0.25
 
     result = 0
     max_matches = 0
     for base_coin in masked_images.keys():
         num_matches = count_matches(masked_images[base_coin], coin_image)
-        num_matches /= ratio(base_coin_matches[base_coin])
-        print(f"matches for {base_coin}: {num_matches}")
+        after_ratio = num_matches / ratio(base_coin)
+        print(f"matches for {base_coin}: {num_matches} after_ratio: {after_ratio}")
+        num_matches = after_ratio
         if num_matches > max_matches and num_matches > threshold:
             result = base_coin
             max_matches = num_matches
@@ -206,7 +218,7 @@ def find_coins(image, threshold=450, draw_circles_on_image=False):
     """
 
     # make the image gray if its not already
-    
+
     gray = image
     if len(image.shape) != 2:
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -283,8 +295,7 @@ def extract_coin_from_image(image, coin_center, coin_radius):
     result = np.zeros_like(masked_circle)
     result[mask == 255] = masked_circle[mask == 255]
 
-    return result
-
+    return cv2.cvtColor(result, cv2.COLOR_RGB2GRAY)
 
 
 def main():
