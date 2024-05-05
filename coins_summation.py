@@ -11,10 +11,10 @@ import numpy.typing
 MatLike = numpy.typing.NDArray[numpy.uint8]
 
 
-def show_image(image, title="Figure"):
+def show_image(image, title="Figure", window_title="window"):
     plt.imshow(image, cmap="gray")
     plt.title(title)
-    plt.gcf().canvas.manager.set_window_title(sys.argv[1].split('/')[-1])
+    plt.gcf().canvas.manager.set_window_title(window_title)
     plt.show()
 
 
@@ -304,27 +304,19 @@ def extract_coin_from_image(image, coin_center, coin_radius):
     return cv2.cvtColor(result, cv2.COLOR_RGB2GRAY)
 
 
-def main(args):
-    if len(args) != 1:
-        print(
-            "format: python coins_summation.py <FILENAME>\nexample: python coins_summation.py 62.jpg"
-        )
-        return
-    image = args[0]
+def main():
+
     masked_images = calculate_masked_images()
-    target_image = cv2.imread(f"{image}")
-
-    if target_image is None:
-        print("image not found\nformat: python coins_summation.py <FILENAME>")
-        return
     
-    print("Please wait, this might take a while...")
-    result = sum_coins(masked_images, target_image)
-    print("Done")
+    for image_name in os.listdir("imgs"):
+        image = cv2.imread(f"imgs/{image_name}")
 
-    show_image(target_image, f"sum: {result}")
+        print(f"calculating sum for image {image_name} please wait...")
+        result = sum_coins(masked_images, image)
+        print("Done")
+
+        show_image(image, f"sum: {result}", image_name)
 
 
 if __name__ == "__main__":
-    args = sys.argv[1:]
-    main(args)
+    main()

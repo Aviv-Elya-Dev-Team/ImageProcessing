@@ -3,10 +3,10 @@ import numpy as np, numpy
 
 
 base_images = {
-    2: cv2.imread("imgs/62.jpg")[3235:4370, 540:1688],
-    5: cv2.imread("imgs/5.jpg")[2025:2925, 1175:2075],
-    10: cv2.imread("imgs/67.jpg")[1489:2281, 187:1000],
-    50: cv2.imread("imgs/50.jpg")[2235:3320, 865:2000],
+    2: cv2.imread("imgs/06.jpg")[3235:4370, 540:1688],
+    5: cv2.imread("imgs/02.jpg")[2025:2925, 1175:2075],
+    10: cv2.imread("imgs/07.jpg")[1489:2281, 187:1000],
+    50: cv2.imread("imgs/04.jpg")[2235:3320, 865:2000],
 }
 
 
