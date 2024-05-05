@@ -2,32 +2,19 @@ import cv2
 import numpy as np
 import os
 from matplotlib import pyplot as plt
-from coin_radius_finder import mask_coin, base_images, mask_circular_objects
+from coin_radius_finder import mask_coin, base_images
 import sys
 
 # typing
 import numpy.typing
 
-# from cv2.typing import Point # TODO: remove if unused
-
 MatLike = numpy.typing.NDArray[numpy.uint8]
 
 
-def show_image_cv(img, title="title"):
-    cv2.namedWindow(title, cv2.WINDOW_NORMAL)
-    cv2.resizeWindow(title, len(img[0]), len(img))
-    cv2.imshow(title, img)
-    cv2.waitKey(0)
-
-
-def show_image_plt(image, title="Figure"):
+def show_image(image, title="Figure"):
     plt.imshow(image, cmap="gray")
     plt.title(title)
     plt.show()
-
-
-def clean_image(image, size=(11, 11), sigmaX=5):
-    return cv2.GaussianBlur(image, ksize=size, sigmaX=sigmaX)
 
 
 def calculate_masked_images():
@@ -48,12 +35,6 @@ def calculate_masked_images():
             10: cv2.cvtColor(mask_coin(base_images[10]), cv2.COLOR_RGB2GRAY),
             50: cv2.cvtColor(mask_coin(base_images[50]), cv2.COLOR_RGB2GRAY),
         }
-        # blur the 50,5 coin because its too high quality and it fucks with
-        # finding keypoint descriptors later
-        # masked_images[50] = cv2.GaussianBlur(masked_images[50], (5,5), 2)
-        # masked_images[10] = cv2.GaussianBlur(masked_images[10], (3,3), 0.67)
-        # masked_images[5] = cv2.GaussianBlur(masked_images[5], (5,5), 1.9)
-        # masked_images[2] = cv2.GaussianBlur(masked_images[2], (3,3), 0.37)
 
     for key in masked_images.keys():
         cv2.imwrite(f"templates/{str(key)}.png", masked_images[key])
@@ -62,7 +43,7 @@ def calculate_masked_images():
 
 
 def count_matches(
-    template_image: MatLike, target_image: MatLike, threshold=0.99, draw_matches=False
+    template_image: MatLike, target_image: MatLike, threshold=0.8, draw_matches=False
 ):
     """
     counts how many good matches are in the target_image from the template_image
@@ -75,19 +56,16 @@ def count_matches(
     Returns:
         int: number of good matches (within the threshold) found
     """
-    # Initialize the SIFT detector
+    # use SIFT to find keypoints inside target_image from template_image
     sift = cv2.SIFT_create()
-
-    # Detect keypoints and descriptors for both images
     keypoints_template, descriptors_template = sift.detectAndCompute(
         template_image, None
     )
     keypoints_target, descriptors_target = sift.detectAndCompute(target_image, None)
 
-    # Initialize a FLANN matcher
+    # use knn to find the best matches
+    # (keep around 80% of them. adjustable using the threshold)
     flann = cv2.FlannBasedMatcher()
-
-    # Perform KNN matching to find the best matches
     matches = flann.knnMatch(descriptors_template, descriptors_target, k=2)
 
     good_matches = []
@@ -96,7 +74,6 @@ def count_matches(
             good_matches.append(m)
 
     if draw_matches:
-
         matched_img = cv2.drawMatches(
             template_image,
             keypoints_template,
@@ -106,17 +83,8 @@ def count_matches(
             None,
             flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS,
         )
-        show_image_plt(matched_img)
+        show_image(matched_img)
     return len(good_matches)
-
-    # get the location of keypoints in the target image
-    target_keypoint_locations = [
-        keypoints_target[match.trainIdx].pt for match in good_matches
-    ]
-    # count the number of unique occurrences
-    unique_locations = set(target_keypoint_locations)
-    # cv2.drawKeypoints(image, target_keypoint_locations)
-    return len(unique_locations)
 
 
 def sum_coins(masked_images, target_image):
@@ -142,11 +110,8 @@ def sum_coins(masked_images, target_image):
             masked_images, base_coin_matches, target_coin_image
         )
         draw_prediction_on_target(target_image, target_coins_circles[i], predicted_coin)
-        show_image_plt(target_image)
         print(f"predicted: {predicted_coin}")
         result += predicted_coin
-
-    show_image_plt(target_image, f"total sum: {result}")
 
     return result
 
@@ -166,20 +131,20 @@ def draw_prediction_on_target(target_image, target_coin_circle, predicted_coin):
 
     # background for the text
     font = cv2.FONT_HERSHEY_PLAIN
-    fontScale = int(radius / 50)
-    text_size, _ = cv2.getTextSize(f"prediction: {predicted_coin}", font, fontScale, 20)
+    fontScale = 12
+    text_size, _ = cv2.getTextSize(f"val: {predicted_coin}", font, fontScale, 20)
     cv2.rectangle(
         target_image,
         (int(x - radius), int(y - radius - text_size[1] - 20)),
         (int(x - radius + text_size[0]), int(y - radius)),
         (255, 255, 255),
-        cv2.FILLED
+        cv2.FILLED,
     )
 
     # the text
     cv2.putText(
         target_image,
-        f"prediction: {predicted_coin}",
+        f"val: {predicted_coin}",
         (int(x - radius), int(y - radius)),
         font,
         fontScale,
@@ -207,21 +172,22 @@ def classify_from_image(
         int: the coin that the given image represents the most
     """
 
-    def ratio(base_coin, num_matches):
+    def ratio(base_coin):
         if base_coin == 50:
-            return 1742
+            return 0.2006299344848081
         if base_coin == 10:
-            return 894
+            return 0.6981966664335424
         if base_coin == 5:
-            return 655
+            return 0.11829741638410693
         if base_coin == 2:
-            return 577
+            return 0.5235495972124882
 
     result = 0
     max_matches = 0
     for base_coin in masked_images.keys():
         num_matches = count_matches(masked_images[base_coin], coin_image)
-        after_ratio = num_matches / ratio(base_coin, num_matches)
+        after_ratio = num_matches * ratio(base_coin)
+        # after_ratio = 1
         print(f"matches for {base_coin}: {num_matches} | after_ratio: {after_ratio}")
         num_matches = after_ratio
         if num_matches > max_matches and num_matches > threshold:
@@ -260,7 +226,6 @@ def find_coins(image, threshold=450, draw_circles_on_image=False):
     """
 
     # make the image gray if its not already
-
     gray = image
     if len(image.shape) != 2:
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -309,7 +274,7 @@ def find_coins(image, threshold=450, draw_circles_on_image=False):
         # draw the average circles on the original image if the user wants
         if draw_circles_on_image:
             for avg_x, avg_y, avg_r in circle_list:
-                cv2.circle(image, (avg_x, avg_y), avg_r, (0, 0, 255), 4)
+                cv2.circle(image, (avg_x, avg_y), avg_r, (255, 0, 0), 10)
 
     return circle_list
 
@@ -350,9 +315,15 @@ def main(args):
         return
     image = args[0]
     masked_images = calculate_masked_images()
-    target_image = cv2.imread(f"imgs/{image}")
+    target_image = cv2.imread(f"{image}")
 
-    sum_coins(masked_images, target_image)
+    if target_image is None:
+        print("image not found\nformat: python coins_summation.py <FILENAME>")
+        return
+
+    result = sum_coins(masked_images, target_image)
+
+    show_image(target_image, f"sum: {result}")
 
 
 if __name__ == "__main__":
