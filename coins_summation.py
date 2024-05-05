@@ -14,6 +14,7 @@ MatLike = numpy.typing.NDArray[numpy.uint8]
 def show_image(image, title="Figure"):
     plt.imshow(image, cmap="gray")
     plt.title(title)
+    plt.gcf().canvas.manager.set_window_title(sys.argv[1].split('/')[-1])
     plt.show()
 
 
