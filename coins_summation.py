@@ -3,6 +3,7 @@ import numpy as np
 import os
 from matplotlib import pyplot as plt
 from coin_radius_finder import mask_coin, base_images, mask_circular_objects
+import sys
 
 # typing
 import numpy.typing
@@ -136,15 +137,56 @@ def sum_coins(masked_images, target_image):
     ]
 
     # classify each coin from the target image and add to the sum
-    for target_coin_image in target_coins_images:
-        target_coin = classify_from_image(
+    for i, target_coin_image in enumerate(target_coins_images):
+        predicted_coin = classify_from_image(
             masked_images, base_coin_matches, target_coin_image
         )
-        result += target_coin
-        show_image_plt(
-            target_coin_image, title=f"Prediction: {target_coin} Sum: {result}"
-        )
+        draw_prediction_on_target(target_image, target_coins_circles[i], predicted_coin)
+        show_image_plt(target_image)
+        print(f"predicted: {predicted_coin}")
+        result += predicted_coin
+
+    show_image_plt(target_image, f"total sum: {result}")
+
     return result
+
+
+def draw_prediction_on_target(target_image, target_coin_circle, predicted_coin):
+    # draw the predicted coin above the target coin in the target image
+    x, y, radius = target_coin_circle
+
+    # a rectangle around the coin
+    cv2.rectangle(
+        target_image,
+        (x - radius, y - radius),
+        (x + radius, y + radius),
+        (255, 0, 0),
+        10,
+    )
+
+    # background for the text
+    font = cv2.FONT_HERSHEY_PLAIN
+    fontScale = int(radius / 50)
+    text_size, _ = cv2.getTextSize(f"prediction: {predicted_coin}", font, fontScale, 20)
+    cv2.rectangle(
+        target_image,
+        (int(x - radius), int(y - radius - text_size[1] - 20)),
+        (int(x - radius + text_size[0]), int(y - radius)),
+        (255, 255, 255),
+        cv2.FILLED
+    )
+
+    # the text
+    cv2.putText(
+        target_image,
+        f"prediction: {predicted_coin}",
+        (int(x - radius), int(y - radius)),
+        font,
+        fontScale,
+        color=(0, 200, 0),
+        thickness=20,
+        lineType=cv2.FILLED,
+    )
 
 
 def classify_from_image(
@@ -165,22 +207,22 @@ def classify_from_image(
         int: the coin that the given image represents the most
     """
 
-    def ratio(base_coin):
+    def ratio(base_coin, num_matches):
         if base_coin == 50:
-            return 1742 / 3868 +0.15
+            return 1742
         if base_coin == 10:
-            return 894 / 3868 + 0.1
+            return 894
         if base_coin == 5:
-            return 655 / 3868 + 0.25
+            return 655
         if base_coin == 2:
-            return 577 / 3868 + 0.25
+            return 577
 
     result = 0
     max_matches = 0
     for base_coin in masked_images.keys():
         num_matches = count_matches(masked_images[base_coin], coin_image)
-        after_ratio = num_matches / ratio(base_coin)
-        print(f"matches for {base_coin}: {num_matches} after_ratio: {after_ratio}")
+        after_ratio = num_matches / ratio(base_coin, num_matches)
+        print(f"matches for {base_coin}: {num_matches} | after_ratio: {after_ratio}")
         num_matches = after_ratio
         if num_matches > max_matches and num_matches > threshold:
             result = base_coin
@@ -224,7 +266,7 @@ def find_coins(image, threshold=450, draw_circles_on_image=False):
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
     edges = circle_edges(gray)
-    circles = circles = cv2.HoughCircles(
+    circles = cv2.HoughCircles(
         edges,
         cv2.HOUGH_GRADIENT,
         1,
@@ -239,7 +281,7 @@ def find_coins(image, threshold=450, draw_circles_on_image=False):
         circles = np.round(circles[0, :]).astype("int")
         grouped_circles = {}
         for x, y, r in circles:
-            if draw_circles_on_image and False:
+            if draw_circles_on_image:
                 cv2.circle(image, (x, y), r, (0, 255, 0), 4)
             added_to_group = False
             for center_point, circle_group in grouped_circles.items():
@@ -256,6 +298,8 @@ def find_coins(image, threshold=450, draw_circles_on_image=False):
         # calculate the average center point and radius for each group
         # and append to circle list
         for center_point, circle_group in grouped_circles.items():
+            if len(circle_group) < 2:
+                continue
             group_x, group_y, group_r = zip(*circle_group)
             avg_x = int(np.mean(group_x))
             avg_y = int(np.mean(group_y))
@@ -298,14 +342,19 @@ def extract_coin_from_image(image, coin_center, coin_radius):
     return cv2.cvtColor(result, cv2.COLOR_RGB2GRAY)
 
 
-def main():
+def main(args):
+    if len(args) != 1:
+        print(
+            "format: python coins_summation.py <FILENAME>\nexample: python coins_summation.py 62.jpg"
+        )
+        return
+    image = args[0]
     masked_images = calculate_masked_images()
-    for image in os.listdir("imgs"):
-        target_image = cv2.imread(f"imgs/{image}")
-        print(sum_coins(masked_images, target_image))
+    target_image = cv2.imread(f"imgs/{image}")
 
-    # print(count_object_appearances(template_image, target_image))
+    sum_coins(masked_images, target_image)
 
 
 if __name__ == "__main__":
-    main()
+    args = sys.argv[1:]
+    main(args)
