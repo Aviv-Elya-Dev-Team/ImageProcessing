@@ -51,7 +51,6 @@ def mask_coin(image):
             -1,
         )
 
-        # Apply the mask to the original image
         result = cv2.bitwise_and(image, image, mask=mask)
         return result
 
@@ -64,7 +63,6 @@ def circle_score(circle, center_img):
 
 
 def distance(point1, point2):
-    # Euclidean distance
     x1, y1 = point1
     x2, y2 = point2
     distance = numpy.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
@@ -73,13 +71,11 @@ def distance(point1, point2):
 
 
 def mask_circular_objects(image):
-    # Convert the image to grayscale
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-    # Apply Gaussian blur to reduce noise
+    # use gaussian blur to reduce noise and use hough 
+    # transform to detect circles inside the image
     blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-
-    # Detect circles using Hough Circle Transform
     circles = cv2.HoughCircles(
         blurred,
         cv2.HOUGH_GRADIENT,
@@ -90,15 +86,13 @@ def mask_circular_objects(image):
         minRadius=200,
         maxRadius=400,
     )
-
-    # Initialize a mask with zeros
+    
     mask = np.zeros(gray.shape, dtype=np.uint8)
 
     if circles is not None:
-        # Convert the circle parameters to integers
         circles = np.round(circles[0, :]).astype("int")
 
-        # Draw circles on the mask
+        # draw circles on the mask
         for x, y, r in circles:
             cv2.circle(mask, (x, y), r, (255), -1)
 

@@ -94,7 +94,6 @@ def sum_coins(masked_images, target_image):
         10: count_matches(masked_images[10], masked_images[10]),
         50: count_matches(masked_images[50], masked_images[50]),
     }
-    print(base_coin_matches)
     result = 0
 
     # extract just the coins from the target image
@@ -110,7 +109,6 @@ def sum_coins(masked_images, target_image):
             masked_images, base_coin_matches, target_coin_image
         )
         draw_prediction_on_target(target_image, target_coins_circles[i], predicted_coin)
-        print(f"predicted: {predicted_coin}")
         result += predicted_coin
 
     return result
@@ -187,8 +185,6 @@ def classify_from_image(
     for base_coin in masked_images.keys():
         num_matches = count_matches(masked_images[base_coin], coin_image)
         after_ratio = num_matches * ratio(base_coin)
-        # after_ratio = 1
-        print(f"matches for {base_coin}: {num_matches} | after_ratio: {after_ratio}")
         num_matches = after_ratio
         if num_matches > max_matches and num_matches > threshold:
             result = base_coin
@@ -320,8 +316,10 @@ def main(args):
     if target_image is None:
         print("image not found\nformat: python coins_summation.py <FILENAME>")
         return
-
+    
+    print("Please wait, this might take a while...")
     result = sum_coins(masked_images, target_image)
+    print("Done")
 
     show_image(target_image, f"sum: {result}")
 
